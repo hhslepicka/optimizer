@@ -11,9 +11,9 @@ import sys
 
 from PyQt5.QtWidgets import QApplication, QFrame
 from PyQt5 import QtGui, QtCore, uic
-from ocelot.optimizer.mint.opt_objects import *
+from mint.opt_objects import *
 
-from ocelot.optimizer.resetpanel.UIresetpanel import Ui_Form
+from UIresetpanel import Ui_Form
 
 sys.path.append("..")
 
@@ -121,6 +121,8 @@ class ResetpanelWindow(QFrame):
         self.ui.tableWidget.setHorizontalHeaderLabels(headers)
         self.ui.tableWidget.setEditTriggers(QtGui.QAbstractItemView.NoEditTriggers)  # No user edits on talbe
         self.ui.tableWidget.horizontalHeader().setResizeMode(QtGui.QHeaderView.Stretch)
+        self.ui.tableWidget.horizontalHeader().setResizeMode(0,QtGui.QHeaderView.ResizeToContents)
+
         for row in range(len(self.pvs)):
 
             self.ui.tableWidget.setRowCount(row + 1)
@@ -283,6 +285,7 @@ def main():
     app = QApplication(sys.argv)
     window = ResetpanelWindow()
     window.setWindowIcon(QtGui.QIcon('/usr/local/lcls/tools/python/toolbox/py_logo.png'))
+    window.setWindowIcon(QtGui.QIcon('resetpanel/py_logo.png'))
     window.getPvList(pvs)
     window.show()
     sys.exit(app.exec_())

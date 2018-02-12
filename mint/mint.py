@@ -5,23 +5,23 @@ Modified for use at LCLS from Ilya's version
 
 The file was modified and were introduced new Objects and methods.
 S. Tomin, 2017
-
+Edited for cleanliness/LCLS use by A. Egger, 2017
 """
-from __future__ import print_function, absolute_import
+from __future__ import print_function
 from time import sleep
 from scipy.optimize import OptimizeResult
 import scipy
 import numpy as np
-from ocelot.optimizer.mint.opt_objects import *
+from opt_objects import *
 from scipy import optimize
-from ocelot.optimizer.GP.bayes_optimization import *
-from ocelot.optimizer.GP.OnlineGP import OGP
+from GP.bayes_optimization import *
+from GP.OnlineGP import OGP
 import pandas as pd
 from threading import Thread
 import sklearn
 sklearn_version = sklearn.__version__
 if sklearn_version >= "0.18":
-    from ocelot.optimizer.GP import gaussian_process as gp_sklearn
+    from GP import gaussian_process as gp_sklearn
 
 class Logger(object):
     def __init__(self, log_file):
@@ -52,6 +52,29 @@ class Minimizer(object):
     def minimize(self, error_func, x):
         pass
 
+class RCDS(Minimizer):
+    def __init__(self):
+        super(RCDS, self).__init__()
+        self.g_noise = 0.1
+        self.g_cnt = 0
+        self.Nvar = 4
+        self.g_vrange = np.matrix(np.ones((self.Nvar,2)))*150
+        self.g_vrange[:,0] *= -1
+        self.g_data = np.zeros([1,self.Nvar+2])
+        self.Imat = np.matrix(np.identity(self.Nvar))
+        #rcds = RCDS(g_noise, g_cnt, Nvar, g_vrange, g_data, Imat)
+        self.p0 = np.matrix(np.ones([self.Nvar,1]))*15.0
+        self.x0 = np.divide(self.p0-self.g_vrange[:,0],self.g_vrange[:,1]-self.g_vrange[:,0])
+        self.y0 = rcds.func_obj(self.x0)
+        self.step = 0.01
+
+    def minimize(self, error_func, x):
+        (xm,fm,nf)=rcds.powellmain(rcds.func_obj,x0,step,Imat)
+        print([x0,xm])
+        print(y0,fm)
+            #for ii in range(g_cnt):
+        #       print(g_data[ii,:])
+
 
 class Simplex(Minimizer):
     def __init__(self):
@@ -68,7 +91,6 @@ class Simplex(Minimizer):
             print("There is zero step. Initial simplex is None")
             isim = None
         else:
-            #step = np.ones(len(x))*0.05
             isim = np.zeros((len(x) + 1, len(x)))
             isim[0, :] = x
             for i in range(len(x)):
@@ -76,16 +98,20 @@ class Simplex(Minimizer):
                 vertex[i] = self.dev_steps[i]
                 isim[i + 1, :] = x + vertex
             print("ISIM = ", isim)
-        #res = optimize.minimize(error_func, x, method='Nelder-Mead',  tol=self.xtol,
-        #                        options = {'disp': False, 'initial_simplex': [0.05, 0.05], 'maxiter': self.max_iter})
         if scipy.__version__ < "0.18":
             res = optimize.fmin(error_func, x, maxiter=self.max_iter, maxfun=self.max_iter, xtol=self.xtol)
         else:
             res = optimize.fmin(error_func, x, maxiter=self.max_iter, maxfun=self.max_iter, xtol=self.xtol, initial_simplex=isim)
-
-        #print("finish seed")
         return res
 
+class ESMin(Minimizer):
+    def __init__(self):
+        super(ESMin, self).__init__()
+        self.ES = ES_min()
+
+    def minimize(self,  error_func, x):
+        self.ES.minimize(error_func, x)
+        return
 
 class GaussProcess(Minimizer):
     def __init__(self):
@@ -101,13 +127,19 @@ class GaussProcess(Minimizer):
         self.numBV = 30
         self.xi = 0.01
         self.bounds = None
+        #self.acq_func = 'PI'
         self.acq_func = 'EI'
+        #self.acq_func = 'UCB'
         self.alt_param = -1
         self.m = 200
         self.iter_bound = False
         self.hyper_file = "../parameters/hyperparameters.npy"
         self.max_iter = 50
         self.norm_coef = 0.1
+        self.multiplier = 1
+        self.simQ = False
+        self.seedScanBool = True
+        self.prior_data = None
 
     def seed_simplex(self):
         opt_smx = Optimizer()
@@ -158,6 +190,7 @@ class GaussProcess(Minimizer):
                                 prior_data=self.prior_data)
 
         self.scanner.max_iter = self.max_iter
+        self.scanner.opt_ctrl = self.opt_ctrl
 
     def minimize(self,  error_func, x):
         #self.target_func = error_func
@@ -167,6 +200,7 @@ class GaussProcess(Minimizer):
         x = [dev.get_value() for dev in self.devices]
         print("start GP")
         self.scanner.minimize(error_func, x)
+	self.saveModel()
         print("finish GP")
         return
 

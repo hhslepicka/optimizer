@@ -9,15 +9,15 @@ The class was modified and was introduced new methods.
 S. Tomin, 2017
 """
 
-from ocelot.optimizer.resetpanel.resetpanel import ResetpanelWindow
+from resetpanel import ResetpanelWindow
 from PyQt5.QtWidgets import QApplication, QFrame, QPushButton, QTableWidget
 from PyQt5 import QtGui, QtCore, Qt, uic
 from PyQt5.QtGui import QClipboard
 import sys
 import time
 #from ocelot.optimizer.mint.opt_objects import *
-from ocelot.optimizer.mint import opt_objects as obj
-from ocelot.optimizer.mint.lcls_interface import *
+from mint import opt_objects as obj
+from mint.lcls_interface import *
 
 
 class customTW(QTableWidget):
@@ -135,6 +135,14 @@ class ResetpanelBoxWindow(ResetpanelWindow):
         self.ui.gridLayout.addWidget(self.ui.tableWidget,0,0)
         #self.ui.tableWidget.itemClicked.connect(self.con)
 
+        #get list of all devices in parameters/lclsparams to set with addTable
+        self.pvsAll = []
+        for line in open('parameters/lclsparams.txt'):
+            l = line.rstrip('\n')
+            self.pvsAll.append(str(l[1:len(l)]))
+
+    def set_parent(self, parent):
+        self.parent = parent
 
     def mouseReleaseEvent(self, evt):
         """
@@ -143,13 +151,47 @@ class ResetpanelBoxWindow(ResetpanelWindow):
         Button 4 is the middle click button.
         """
         button = evt.button()
-        #print("Release event: ", button, self.parent.enableMiddleClick)
         if (button == 4) and (self.enableMiddleClick):
             pv = QtGui.QApplication.clipboard().text(mode=QClipboard.Selection)
             self.addPv(pv)
 
-    def set_parent(self, parent):
-        self.parent = parent
+    def clearTable(self):
+        self.ui.tableWidget.clearContents()
+        self.ui.tableWidget.setRowCount(0)
+        self.pvs=[]
+        self.devices = []
+
+    def addTable(self,index):
+        """
+        Add a set of devices based on dropdown selection
+
+        Args:
+                index (int): index of selection from deviceList QComboBox
+        """
+        self.devices = []
+        if index == 0:
+            self.pvs.extend(self.pvsAll[22:28])#IN20 Quads
+        if index == 1:
+            self.pvs.extend(self.pvsAll[18:22])#LI21 Quads
+        if index == 2:
+            self.pvs.extend(self.pvsAll[4:8])#LI26 201-501
+        if index == 3:
+            self.pvs.extend(self.pvsAll[8:12])#Li26 601-901
+        if index == 4:
+            self.pvs.extend(self.pvsAll[0:4])#LTU Quads
+        if index == 5:
+            self.pvs.extend(self.pvsAll[12:18])#Dispersion Quads
+        if index == 6:
+            self.pvs.extend(self.pvsAll[28:31])#CQ/SQ01/SOL
+        if index == 7:
+            self.pvs.extend(self.pvsAll[31:35])#DMD
+
+        for pv in self.pvs:
+            dev = self.parent.create_devices(pvs =[pv])[0]
+            self.devices.append(dev)
+        self.getStartValues()
+        self.initTable()
+        self.addCheckBoxes()
 
     def addPv(self, pv):
         """
@@ -163,7 +205,6 @@ class ResetpanelBoxWindow(ResetpanelWindow):
             print ("PV already in list")
             return
         try:
-            #print("try to create dev")
             dev = self.parent.create_devices(pvs=[pv])[0]#obj.TestDevice(eid=pv)
 
         except:

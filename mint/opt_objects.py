@@ -19,11 +19,13 @@ class Device(object):
         self.dp = None
 
     def set_value(self, val):
+        """ Set Value for devices, record time and value """
         self.values.append(val)
         self.times.append(time.time())
         self.mi.set_value(self.eid, val)
 
     def get_value(self):
+        """ Standard get_value method for devices """
         val = self.mi.get_value(self.eid)
         return val
 
@@ -41,6 +43,7 @@ class Device(object):
         return state
 
     def clean(self):
+        """ Init time and value list for device """
         self.values = []
         self.times = []
 
@@ -52,7 +55,10 @@ class Device(object):
         return False
 
     def get_limits(self):
-        return self.dp.get_limits(self.eid)
+        if self.dp is not None:
+            return self.dp.get_limits(self.eid)
+        else:
+            return self.mi.get_limits(self.eid)
 
 
 # for testing
@@ -186,28 +192,35 @@ class Target_test(Target):
         return 3
 
 
-class SLACTarget(Target):
-    def __init__(self, mi=None, dp=None, eid=None):
+class SLACTarget(object):
+    def __init__(self, mi=None, eid=None):
+        super(SLACTarget, self).__init__()
         """
-
         :param mi: Machine interface
         :param dp: Device property
         :param eid: ID
         """
-        super(SLACTarget, self).__init__(eid=eid)
-        self.secs_to_ave = 2
-        self.debug = False
+        self.eid = eid
+        self.secs_to_ave = 1
         self.kill = False
         self.pen_max = 100
         self.niter = 0
         self.y = []
         self.x = []
+        self.id = eid
+        self.pen_max = 100
+        self.penalties = []
+        self.values = []
+        self.alarms = []
+        self.times = []
+        self.std_dev = []
+        self.charge = []
+        self.current = []
+        self.points = None
 
     def get_penalty(self):
-        sase = self.get_value()
+        sase, std, charge, current = self.get_value()
         alarm = self.get_alarm()
-        if self.debug: print('alarm:', alarm)
-        if self.debug: print('sase:', sase)
         pen = 0.0
         if alarm > 1.0:
             return self.pen_max
@@ -215,40 +228,43 @@ class SLACTarget(Target):
             return alarm * 50.0
         pen += alarm
         pen -= sase
-        if self.debug: print('penalty:', pen)
+        self.penalties.append(pen)
+        self.times.append(time.time())
+        self.values.append(sase)
+        self.std_dev.append(std)
+        self.alarms.append(alarm)
+        self.charge.append(charge)
+        self.current.append(current)
         self.niter += 1
-        print("niter = ", self.niter)
-        self.y.append(pen)
-        self.x.append(self.niter)
         return pen
 
-    def get_value(self, seconds=None):
-        """
-        Returns data for the ojective function (sase) from the selected detector PV.
+    def check_machine(self):
+        """ Check the machine for errors """
+        self.mi.errorCheck()
 
+    def get_value(self):
+        """
+        Returns data for the ojective function (detector) from the selected detector PV.
         At lcls the repetition is  120Hz and the readout buf size is 2800.
         The last 120 entries correspond to pulse energies over past 1 second.
-
         Args:
                 seconds (float): Variable input on how many seconds to average data
-
         Returns:
                 Float of SASE or other detecor measurment
+                Float of Standard Deviation of array, or -1 for non-array.
         """
-        datain = mi.get_value(self.eid)
-        try: #try to average over and array input
-            if seconds == None: #if a resquested seconds is passed
-                dataout = np.mean(datain[-(self.secs_to_ave*120):])
-                sigma   = np.std( datain[-(self.secs_to_ave*120):])
-            else:
-                dataout = np.mean(datain[-(seconds*120):])
-                sigma   = np.std( datain[-(seconds*120):])
-        except: #if average fails use the scaler input
-            print ("Detector is not a waveform PV, using scalar value")
-            dataout = datain
-            sigma   = -1
-        return dataout
+        datain = self.mi.get_value(self.eid)
+        dataout, sigma = self.mi.get_sase(datain, self.points)
+        charge, current = self.mi.get_charge_current()
+        return dataout, sigma, charge, current
 
+    def get_alarm(self):
+        """ Used with alarms, not used for now """
+        return 0
+
+    def get_energy(self):
+        """ Get Energy for hyperparams loading """
+        return self.mi.get_energy()
     def get_stat_params(self):
         #get the current mean and std of the chosen detector
         obj_func = mi.get_value(self.eid)
@@ -267,10 +283,17 @@ class SLACTarget(Target):
 
         return ave, std
 
+    def clean(self):
+        self.niter = 0
+        self.penalties = []
+        self.times = []
+        self.alarms = []
+        self.values = []
+
     def get_alarm(self):
+        """ Used with alarms, not used for now """
         return 0
 
     def get_energy(self):
-        return mi.get_energy()
-
-
+        """ Get Energy for hyperparams loading """
+        return self.mi.get_energy()
