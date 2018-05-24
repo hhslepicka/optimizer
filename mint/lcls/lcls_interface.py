@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Machine interface file for the LCLS to ocelot optimizer
 

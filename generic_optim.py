@@ -44,6 +44,8 @@ from mint import opt_objects as obj
 
 from mint.xfel_interface import *
 from mint.lcls.lcls_interface import *
+from mint.sint.corrplot_interface import CorrplotInterface
+from mint.sint.multinormal_interface import MultinormalInterface
 from stats import stats
 
 
