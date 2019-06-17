@@ -7,6 +7,8 @@ This file primarily contains the code for the UI and GUI
 The scanner classes are contained in an external file, scannerThreads.py
 The resetpanel widget is also contained in a separate module, resetpanel
 Tyler Cope, 2016
+
+Editing the line.
 """
 from __future__ import absolute_import, print_function
 import sys
